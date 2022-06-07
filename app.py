@@ -1,6 +1,5 @@
 import os
 
-
 from flask import Flask, request
 from werkzeug.exceptions import BadRequest
 
@@ -12,20 +11,36 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 
 def build_query(it, cmd, value):
     res = map(lambda v: v.strip(), it)
-    if cmd == 'filter':
-        res = filter(lambda v: value in v, res)
-    if cmd == 'sort':
-        value = bool(value)
-        res = sorted(res, reverse=value)
-    if cmd == 'unique':
-        res = set(res)
-    if cmd == 'limit':
-        value = int(value)
-        res = list(res)[:value]
-    if cmd == 'map':
-        value = int(value)
-        res = map(lambda v: v.split(' ')[value], res)
+    match cmd:
+        case 'filter':
+            res = filter(lambda v: value in v, res)
+        case 'sort':
+            value = bool(value)
+            res = sorted(res, reverse=value)
+        case 'unique':
+            res = set(res)
+        case 'limit':
+            value = int(value)
+            res = list(res)[:value]
+        case 'map':
+            value = int(value)
+            res = map(lambda v: v.split(' ')[value], res)
     return res
+
+    # if cmd == 'filter':
+    #     res = filter(lambda v: value in v, res)
+    # if cmd == 'sort':
+    #     value = bool(value)
+    #     res = sorted(res, reverse=value)
+    # if cmd == 'unique':
+    #     res = set(res)
+    # if cmd == 'limit':
+    #     value = int(value)
+    #     res = list(res)[:value]
+    # if cmd == 'map':
+    #     value = int(value)
+    #     res = map(lambda v: v.split(' ')[value], res)
+    # return res
 
 
 @app.route("/perform_query")
@@ -36,7 +51,7 @@ def perform_query():
         val1 = request.args['value1']
         val2 = request.args['value2']
         file_name = request.args['file_name']
-    except:
+    except KeyError:
         return BadRequest
 
     path_file = os.path.join(DATA_DIR, file_name)
