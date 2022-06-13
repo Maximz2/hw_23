@@ -1,6 +1,8 @@
 import os
+import re
+from typing import Iterator
 
-from flask import Flask, request
+from flask import Flask, request, Response
 from werkzeug.exceptions import BadRequest
 
 app = Flask(__name__)
@@ -9,42 +11,37 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 
-def build_query(it, cmd, value):
+def slice_limit(it: Iterator, value: int) -> Iterator:
+    i = 0
+    for item in it:
+        if i < value:
+            yield item
+        else:
+            break
+        i += 1
+
+
+def build_query(it: Iterator, cmd: str, value: str) -> Iterator:
     res = map(lambda v: v.strip(), it)
     match cmd:
         case 'filter':
-            res = filter(lambda v: value in v, res)
+            return filter(lambda v: value in v, res)
         case 'sort':
-            value = bool(value)
-            res = sorted(res, reverse=value)
+            return iter(sorted(res, reverse=bool(value)))
         case 'unique':
-            res = set(res)
+            return iter(set(res))
         case 'limit':
-            value = int(value)
-            res = list(res)[:value]
+            return slice_limit(res, int(value))
         case 'map':
-            value = int(value)
-            res = map(lambda v: v.split(' ')[value], res)
+            return map(lambda v: v.split(' ')[int(value)], res)
+        case 'regex':
+            regex = re.compile(value)
+            return filter(lambda x: regex.search(x), res)
     return res
 
-    # if cmd == 'filter':
-    #     res = filter(lambda v: value in v, res)
-    # if cmd == 'sort':
-    #     value = bool(value)
-    #     res = sorted(res, reverse=value)
-    # if cmd == 'unique':
-    #     res = set(res)
-    # if cmd == 'limit':
-    #     value = int(value)
-    #     res = list(res)[:value]
-    # if cmd == 'map':
-    #     value = int(value)
-    #     res = map(lambda v: v.split(' ')[value], res)
-    # return res
 
-
-@app.route("/perform_query")
-def perform_query():
+@app.route("/perform_query", methods=['POST'])
+def perform_query() -> Response:
     try:
         cmd1 = request.args['cmd1']
         cmd2 = request.args['cmd2']
@@ -52,15 +49,19 @@ def perform_query():
         val2 = request.args['value2']
         file_name = request.args['file_name']
     except KeyError:
-        return BadRequest
+        raise BadRequest
 
     path_file = os.path.join(DATA_DIR, file_name)
     if not os.path.exists(path_file):
-        return BadRequest
+        raise BadRequest
 
     with open(path_file) as f:
         res = build_query(f, cmd1, val1)
         res = build_query(res, cmd2, val2)
-        res = "\n".join(res)
+        content = "\n".join(res)
 
-    return app.response_class(res, content_type="text/plain")
+    return app.response_class(content, content_type="text/plain")
+
+
+if __name__ == '__main__':
+    app.run()
